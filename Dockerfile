@@ -1,6 +1,6 @@
 FROM node:20-bookworm AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
 COPY apps ./apps
 COPY config ./config
