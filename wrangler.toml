@@ -1,12 +1,15 @@
-name = "ghl"
+# workers.dev host is leadrouter.<account>.workers.dev.
+# HighLevel rejects a redirect URL that contains "ghl", so this script is not named ghl.
+# Static assets are served by this same Worker (binding ASSETS).
+name = "leadrouter"
 main = "apps/worker/src/index.ts"
 compatibility_date = "2026-03-10"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# Custom domain is attached after the first workers.dev deploy. See docs/deploy.md.
+# Custom domain after the workers.dev deploy. See docs/deploy.md.
 # [[routes]]
-# pattern = "ghl.quvantic.com"
+# pattern = "leads.quvantic.com"
 # custom_domain = true
 
 [assets]
@@ -49,17 +52,15 @@ queue = "ghl-jobs-dlq"
 max_batch_size = 5
 max_retries = 1
 
-# Mock credentials. They match the bundled mock and .env.example.
-# Live mode replaces them with `wrangler secret put`. Secrets override these vars.
+# Non-secret config only. A name listed here cannot also be a secret.
+# Mock mode fills client id, client secret, webhook secrets, and the demo
+# encryption key in code when they are absent. Live mode requires them via
+# `wrangler secret put`, and those names must stay out of [vars].
 [vars]
 GHL_MODE = "mock"
-GHL_CLIENT_ID = "mock-client-id"
-GHL_CLIENT_SECRET = "mock-client-secret"
 GHL_BASE_URL = "https://services.leadconnectorhq.com"
-META_VERIFY_TOKEN = "mock-meta-verify"
-META_APP_SECRET = "mock-meta-secret"
-FORM_WEBHOOK_SECRET = "mock-form-secret"
-TOKEN_ENCRYPTION_KEY = "ZGVtby1vbmx5LWtleS1ub3QtZm9yLWxpdmUtdXNlISE="
+GHL_USER_TYPE = "Location"
+GHL_OAUTH_AUTHORIZE_URL = "https://marketplace.gohighlevel.com/oauth/chooselocation"
 BUSINESS_NAME = "Northwind Studio"
 LOCATION_ID = "loc_northwind_555"
 COMPANY_ID = "co_northwind_555"

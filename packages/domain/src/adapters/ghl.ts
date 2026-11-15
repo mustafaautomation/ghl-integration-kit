@@ -41,11 +41,17 @@ export class GhlAdapter implements CrmAdapter {
     private readonly opts: {
       baseUrl: string;
       locationId: string;
+      getLocationId?: () => Promise<string>;
       getToken: () => Promise<string>;
       fieldIds: Record<string, string>;
       fetchImpl?: typeof fetch;
     },
   ) {}
+
+  private async locationId(): Promise<string> {
+    if (this.opts.getLocationId) return this.opts.getLocationId();
+    return this.opts.locationId;
+  }
 
   private async call(method: string, path: string, body?: unknown, query?: Record<string, string | number | undefined>) {
     const token = await this.opts.getToken();
@@ -58,7 +64,7 @@ export class GhlAdapter implements CrmAdapter {
 
   async upsertContact(input: ContactInput): Promise<ContactRecord> {
     const json = await this.call('POST', '/contacts/upsert', {
-      locationId: this.opts.locationId,
+      locationId: await this.locationId(),
       firstName: input.firstName,
       lastName: input.lastName,
       email: input.email,
@@ -85,7 +91,7 @@ export class GhlAdapter implements CrmAdapter {
     const json = await this.call('POST', '/conversations/messages', {
       type: input.type,
       contactId: input.contactId,
-      locationId: this.opts.locationId,
+      locationId: await this.locationId(),
       message: input.type === 'SMS' ? input.body : undefined,
       subject: input.subject,
       html: input.type === 'Email' ? (input.html ?? input.body) : undefined,
@@ -96,7 +102,7 @@ export class GhlAdapter implements CrmAdapter {
 
   async createOpportunity(input: OpportunityInput): Promise<OpportunityRecord> {
     const json = await this.call('POST', '/opportunities/', {
-      locationId: this.opts.locationId,
+      locationId: await this.locationId(),
       pipelineId: input.pipelineId,
       pipelineStageId: input.stageId,
       name: input.name,
@@ -127,7 +133,7 @@ export class GhlAdapter implements CrmAdapter {
   async bookAppointment(input: AppointmentInput): Promise<AppointmentRecord> {
     const json = await this.call('POST', '/calendars/events/appointments', {
       calendarId: input.calendarId,
-      locationId: this.opts.locationId,
+      locationId: await this.locationId(),
       contactId: input.contactId,
       startTime: input.startTime,
       title: input.title,

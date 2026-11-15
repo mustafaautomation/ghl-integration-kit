@@ -1,7 +1,7 @@
 import { bookSlot, ghlFetch, runMissedCall, runSpeedToLead, type Job } from '@ghl/domain/edge';
 import { z } from 'zod';
 import type { Env } from './env.js';
-import { baseUrl, createServices, flowDeps, type Services } from './runtime.js';
+import { baseUrl, createServices, flowDeps, resolveLocationId, type Services } from './runtime.js';
 
 export type JobResult = 'done' | 'dead' | { retrySeconds: number };
 
@@ -24,8 +24,9 @@ async function dispatch(env: Env, services: Services, job: Job): Promise<void> {
     return;
   }
   if (job.name === 'ghl-probe') {
-    const token = await services.tokens.getValidAccessToken(env.LOCATION_ID);
-    await ghlFetch(baseUrl(env), { method: 'GET', path: `/locations/${env.LOCATION_ID}`, token }, { fetchImpl: services.fetchImpl });
+    const locationId = await resolveLocationId(env, services.store);
+    const token = await services.tokens.getValidAccessToken(locationId);
+    await ghlFetch(baseUrl(env), { method: 'GET', path: `/locations/${locationId}`, token }, { fetchImpl: services.fetchImpl });
     return;
   }
   throw new Error(`unknown_job:${job.name}`);

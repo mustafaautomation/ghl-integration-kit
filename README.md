@@ -6,7 +6,7 @@ A TypeScript kit for a GoHighLevel Marketplace app: OAuth install, signed webhoo
 
 ## Live demo
 
-[https://ghl.quvantic.com](https://ghl.quvantic.com) is the public host for this kit. It serves the API, the operator console, and the mock LeadConnector from one Cloudflare Worker, with D1 for the store and a Cloudflare Queue for jobs. GoHighLevel on that host is the bundled mock. It uses the real LeadConnector API only when `GHL_MODE=live` and real marketplace credentials are set. Deploy steps and the Workers free-plan limits are in [docs/deploy.md](docs/deploy.md). Local Docker Compose is unchanged.
+[https://leadrouter.squishwala.workers.dev](https://leadrouter.squishwala.workers.dev) is the public host for this kit. It serves the API, the operator console, and the mock LeadConnector from one Cloudflare Worker, with D1 for the store and a Cloudflare Queue for jobs. GoHighLevel on that host is the bundled mock. Live mode is for a HighLevel sandbox: set `GHL_MODE=live` and the marketplace credentials. The OAuth redirect is `https://leadrouter.squishwala.workers.dev/api/oauth/callback`, and later `https://leads.quvantic.com/api/oauth/callback`. Deploy steps and the Workers free-plan limits are in [docs/deploy.md](docs/deploy.md). Local Docker Compose is unchanged.
 
 ```mermaid
 flowchart LR

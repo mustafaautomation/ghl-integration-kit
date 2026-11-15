@@ -3,6 +3,7 @@ import { resetDemo, createApp } from './api.js';
 import type { Env } from './env.js';
 import { runJob } from './jobs.js';
 import { MockGhl } from './mock-do.js';
+import { rateLimitKey } from './live.js';
 import { takeRateLimit } from './rate-limit.js';
 import { createServices } from './runtime.js';
 
@@ -16,7 +17,8 @@ function tooLarge(request: Request, env: Env): boolean {
 }
 
 function clientIp(request: Request): string {
-  return request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const raw = request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  return rateLimitKey(raw);
 }
 
 async function limited(request: Request, env: Env): Promise<Response | null> {
@@ -53,6 +55,11 @@ const handler: ExportedHandler<Env, JobMessage> = {
       const next = new URL(request.url);
       next.pathname = url.pathname.replace(/^\/api/, '') || '/';
       return app.fetch(new Request(next, request), env, ctx);
+    }
+    if (/^\/leads\/[^/]+\/index\.txt$/.test(url.pathname) && !url.pathname.includes('/_/')) {
+      const shell = new URL(request.url);
+      shell.pathname = '/leads/_/index.txt';
+      return env.ASSETS.fetch(new Request(shell, { method: 'GET' }));
     }
     if (/^\/leads\/[^/]+\/?$/.test(url.pathname) && !url.pathname.includes('/_/')) {
       const shell = new URL(request.url);

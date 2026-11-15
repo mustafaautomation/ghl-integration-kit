@@ -81,6 +81,20 @@ function flag(value: number | boolean): boolean {
   return value === true || value === 1;
 }
 
+function toInstall(row: InstallRow): InstallationRecord {
+  return {
+    locationId: row.location_id,
+    companyId: row.company_id ?? undefined,
+    userId: row.user_id ?? undefined,
+    userType: row.user_type === 'Company' ? 'Company' : 'Location',
+    accessTokenEnc: row.access_token_enc,
+    refreshTokenEnc: row.refresh_token_enc,
+    expiresAt: new Date(row.expires_at),
+    scope: row.scope,
+    uninstalledAt: row.uninstalled_at ? new Date(row.uninstalled_at) : null,
+  };
+}
+
 export class D1Store implements OperatorStore {
   constructor(private readonly db: SqlDb) {}
 
@@ -105,20 +119,16 @@ export class D1Store implements OperatorStore {
     }
   }
 
+  async latestActive(): Promise<InstallationRecord | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM installations WHERE uninstalled_at IS NULL ORDER BY updated_at DESC LIMIT 1`)
+      .first<InstallRow>();
+    return row ? toInstall(row) : null;
+  }
+
   async get(locationId: string): Promise<InstallationRecord | null> {
     const row = await this.db.prepare('SELECT * FROM installations WHERE location_id = ?').bind(locationId).first<InstallRow>();
-    if (!row) return null;
-    return {
-      locationId: row.location_id,
-      companyId: row.company_id ?? undefined,
-      userId: row.user_id ?? undefined,
-      userType: row.user_type === 'Company' ? 'Company' : 'Location',
-      accessTokenEnc: row.access_token_enc,
-      refreshTokenEnc: row.refresh_token_enc,
-      expiresAt: new Date(row.expires_at),
-      scope: row.scope,
-      uninstalledAt: row.uninstalled_at ? new Date(row.uninstalled_at) : null,
-    };
+    return row ? toInstall(row) : null;
   }
 
   async save(record: InstallationRecord): Promise<void> {
