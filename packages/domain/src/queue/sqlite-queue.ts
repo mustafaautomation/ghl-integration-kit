@@ -1,22 +1,9 @@
 import Database from 'better-sqlite3';
 import { newId } from '../ids.js';
 import { computeBackoffMs, RateLimitError } from './backoff.js';
+import type { Job, JobStatus } from './types.js';
 
-export type JobStatus = 'pending' | 'active' | 'completed' | 'dead';
-
-export interface Job {
-  id: string;
-  name: string;
-  payload: unknown;
-  status: JobStatus;
-  attempts: number;
-  maxAttempts: number;
-  runAt: number;
-  lastError: string | null;
-  correlationId: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
+export type { Job, JobStatus } from './types.js';
 
 interface JobRow {
   id: string;

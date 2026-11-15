@@ -4,6 +4,10 @@
 
 A TypeScript kit for a GoHighLevel Marketplace app: OAuth install, signed webhooks, lead ingest, and a speed-to-lead path that upserts a contact, sends a first text and email, opens an opportunity, and books a calendar slot. It runs against a mock LeadConnector server so you can try the whole path without a GHL account. Point the same process at `https://services.leadconnectorhq.com` when you have a marketplace app.
 
+## Live demo
+
+[https://ghl.quvantic.com](https://ghl.quvantic.com) is the public host for this kit. It serves the API, the operator console, and the mock LeadConnector from one Cloudflare Worker, with D1 for the store and a Cloudflare Queue for jobs. GoHighLevel on that host is the bundled mock. It uses the real LeadConnector API only when `GHL_MODE=live` and real marketplace credentials are set. Deploy steps and the Workers free-plan limits are in [docs/deploy.md](docs/deploy.md). Local Docker Compose is unchanged.
+
 ```mermaid
 flowchart LR
   meta[Meta Lead Ads]

@@ -1,6 +1,7 @@
 node_modules
 dist
 .next
+apps/console/out
 coverage
 playwright-report
 test-results

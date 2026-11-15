@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -p packages/domain/tsconfig.json --noEmit && tsc -p packages/db/tsconfig.json --noEmit && tsc -p apps/mock-ghl/tsconfig.json --noEmit && tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/console/tsconfig.json --noEmit",
+    "typecheck": "tsc -p packages/domain/tsconfig.json --noEmit && tsc -p packages/db/tsconfig.json --noEmit && tsc -p apps/mock-ghl/tsconfig.json --noEmit && tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/console/tsconfig.json --noEmit && tsc -p apps/worker/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --coverage packages/domain apps/api/src apps/console/lib",
     "test:contract": "vitest run apps/mock-ghl/test packages/domain/src/adapters/contract.test.ts",
@@ -26,10 +26,15 @@
     "start:mock": "tsx apps/mock-ghl/src/main.ts",
     "start:api": "tsx apps/api/src/main.ts",
     "start:console": "npm run start -w @ghl/console",
-    "db:migrate": "tsx packages/db/src/migrate-cli.ts"
+    "db:migrate": "tsx packages/db/src/migrate-cli.ts",
+    "test:workers": "mkdir -p apps/console/out && [ -f apps/console/out/index.html ] || printf '%s\\n' '<!doctype html><title>Northwind</title>' > apps/console/out/index.html && vitest run -c apps/worker/vitest.config.ts",
+    "build:console:cf": "CONSOLE_EXPORT=1 NEXT_PUBLIC_API_BASE=/api npm run build -w @ghl/console",
+    "build:workers": "npm run build:console:cf && wrangler deploy --dry-run --outdir dist/worker"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@eslint/js": "^9.16.0",
     "@playwright/test": "^1.49.1",
     "@types/better-sqlite3": "^7.6.12",
@@ -41,6 +46,7 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.1",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "wrangler": "^4.72.0"
   }
 }

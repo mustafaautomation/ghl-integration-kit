@@ -120,3 +120,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose build
+
+  workers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run test:workers
+      - run: npm run build:workers

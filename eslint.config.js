@@ -6,6 +6,8 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',
+      'apps/console/out/**',
+      'dist/**',
       '**/coverage/**',
       '**/playwright-report/**',
       '**/test-results/**',

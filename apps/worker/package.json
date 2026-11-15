@@ -1,0 +1,12 @@
+{
+  "name": "@ghl/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ghl/db": "*",
+    "@ghl/domain": "*",
+    "hono": "^4.13.18",
+    "zod": "^3.24.1"
+  }
+}

@@ -16,7 +16,7 @@ export default function LeadsPage() {
       setLeads(body.leads);
       setError(null);
     } catch {
-      setError('The API is not answering on port 4000.');
+      setError('The API is not answering.');
     }
   }
 

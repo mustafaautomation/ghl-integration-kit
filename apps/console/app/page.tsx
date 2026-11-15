@@ -25,7 +25,7 @@ function Overview() {
       setError(null);
       return nextLeads.leads;
     } catch {
-      setError('The API is not answering on port 4000. Start the stack, then try again.');
+      setError('The API is not answering. Start the stack, then try again.');
       return [];
     }
   }

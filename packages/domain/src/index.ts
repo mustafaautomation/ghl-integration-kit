@@ -15,6 +15,7 @@ export * from './mapping/fields.js';
 export * from './logging/logger.js';
 export * from './queue/backoff.js';
 export * from './queue/sqlite-queue.js';
+export type { Job, JobStatus } from './queue/types.js';
 export * from './ghl/schemas.js';
 export * from './ghl/client.js';
 export * from './adapters/types.js';

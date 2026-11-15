@@ -8,6 +8,7 @@ import {
   webhookEvents,
   webhookInspections,
   type Database,
+  type OperatorStore,
 } from '@ghl/db';
 import {
   identityKeys,
@@ -55,7 +56,7 @@ export interface LeadDetail {
   slots: string[];
 }
 
-export class Repositories implements InstallationStore {
+export class Repositories implements InstallationStore, OperatorStore {
   constructor(
     private readonly db: Database,
     private readonly bus: Bus,

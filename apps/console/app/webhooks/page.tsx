@@ -36,7 +36,7 @@ export default function WebhooksPage() {
       setSelected((current) => current ?? (body.inspections[0] ? String(body.inspections[0].id) : null));
       setError(null);
     } catch {
-      setError('The API is not answering on port 4000.');
+      setError('The API is not answering.');
     }
   }
 

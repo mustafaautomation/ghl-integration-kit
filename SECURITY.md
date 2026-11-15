@@ -26,9 +26,11 @@ GHL signatures are checked against the raw body bytes. `X-GHL-Signature` (Ed2551
 
 Demo routes (`/demo/test-lead`, `/demo/reset`) exist only when `GHL_MODE=mock`.
 
+The public Worker adds two controls the local process does not need. Each IP is limited to 120 requests a minute on `/api` and `/mock`, and request bodies over 256 KB are rejected. A cron trigger every six hours deletes demo leads, inspections, and queue rows, and clears the mock CRM. Install tokens are kept. The console still has no login.
+
 ## Input
 
-Request bodies are capped at 256 KB. Payloads are parsed with Zod before they become leads or CRM calls. Phone numbers are normalised to E.164 or dropped.
+Request bodies are capped at 256 KB. The Worker enforces that cap before the handler reads the body, and also rate-limits public `/api` and `/mock` calls per IP. Payloads are parsed with Zod before they become leads or CRM calls. Phone numbers are normalised to E.164 or dropped.
 
 ## What this does not do
 
