@@ -21,6 +21,7 @@ import {
   createLogger,
   createOauthState,
   eventsListSchema,
+  bucketHours,
   ghlFetch,
   headerMap,
   inspectionForRejection,
@@ -142,6 +143,7 @@ export async function buildServer(deps: AppDeps) {
     stageBooked: deps.config.stageBooked,
     calendarId: deps.config.calendarId,
     timezone: deps.config.timezone,
+    stepDelayMs: deps.config.stepDelayMs,
   });
 
   const worker = new QueueWorker(
@@ -158,6 +160,14 @@ export async function buildServer(deps: AppDeps) {
       'missed-call': async (payload) => {
         const { leadId } = z.object({ leadId: z.string() }).parse(payload);
         await runMissedCall(flow(), leadId);
+      },
+      'ghl-probe': async () => {
+        const token = await tokens.getValidAccessToken(deps.config.locationId);
+        await ghlFetch(deps.config.ghlBaseUrl, {
+          method: 'GET',
+          path: `/locations/${deps.config.locationId}`,
+          token,
+        });
       },
     },
     deps.config.queuePollMs,
@@ -440,12 +450,42 @@ export async function buildServer(deps: AppDeps) {
     return { ok: true };
   });
 
+  app.post('/demo/fail-outbound', async (req, reply) => {
+    if (deps.config.mode !== 'mock') return reply.code(404).send({ error: 'not_found' });
+    const body = z
+      .object({
+        failures: z.number().int().positive().max(8).default(1),
+        retryAfterSeconds: z.number().nonnegative().default(1),
+        maxAttempts: z.number().int().positive().max(8).optional(),
+      })
+      .parse(req.body ?? {});
+    const armed = await fetch(`${deps.config.ghlBaseUrl}/_debug/fail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count: body.failures, retryAfterSeconds: body.retryAfterSeconds }),
+    });
+    if (!armed.ok) return reply.code(502).send({ error: 'mock_unavailable' });
+    const jobId = queue.enqueue('ghl-probe', { purpose: 'rate-limit-demo' }, {
+      maxAttempts: body.maxAttempts ?? Math.max(body.failures + 1, 2),
+      correlationId: 'probe',
+    });
+    return reply.code(202).send({ jobId });
+  });
+
   app.get('/stats', async () => {
     const counts = await repos.stats();
-    const dead = queue.list('dead', 100).length;
+    const stamps = await repos.activityStamps();
+    const now = new Date();
+    const deadJobs = queue.list('dead', 100);
     return {
       ...counts,
-      deadLetters: dead,
+      deadLetters: deadJobs.length,
+      series: {
+        leads: bucketHours(stamps.leads, now),
+        messages: bucketHours(stamps.messages, now),
+        booked: bucketHours(stamps.booked, now),
+        deadLetters: bucketHours(deadJobs.map((job) => new Date(job.updatedAt)), now),
+      },
       mode: deps.config.mode,
       businessName: deps.config.businessName,
       locationId: deps.config.locationId,
@@ -482,10 +522,19 @@ export async function buildServer(deps: AppDeps) {
     proxyCrm(ctx, reply, '/calendars/events', { locationId: deps.config.locationId, calendarId: deps.config.calendarId }, eventsListSchema),
   );
 
+  app.get('/offers', async () => ({ offers: await repos.openOffers() }));
+
   app.get('/queue', async () => ({
     dead: queue.list('dead', 50),
     recent: queue.list(undefined, 50),
   }));
+
+  app.post('/queue/:id/replay', async (req, reply) => {
+    const params = z.object({ id: z.string() }).parse(req.params);
+    const job = queue.replay(params.id);
+    if (!job) return reply.code(404).send({ error: 'not_replayable' });
+    return job;
+  });
 
   app.get('/stream', async (req, reply) => {
     const query = z.object({ leadId: z.string().optional() }).parse(req.query);

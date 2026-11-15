@@ -2,9 +2,22 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ErrorNote, Pill } from '../../../components/ui';
+import { JsonBlock } from '../../../components/Visuals';
+import { ErrorNote, Pill, Skeleton } from '../../../components/ui';
 import { apiBase, apiGet, type LeadDetail, type LeadEvent } from '../../../lib/api';
 import { eventNote, eventTitle, formatSlot, formatWhen, sourceLabel, statusLabel, statusTone } from '../../../lib/format';
+
+function stepTone(type: string): 'good' | 'warn' | 'bad' | 'info' | 'accent' {
+  if (type === 'booked' || type === 'stage_moved') return 'good';
+  if (type === 'deduped' || type === 'slots_offered') return 'warn';
+  if (type === 'sms_sent' || type === 'email_sent' || type === 'text_back') return 'info';
+  return 'accent';
+}
+
+function formatGap(ms: number): string {
+  if (ms < 1000) return `${Math.max(0, ms)} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
 
 export default function LeadPage() {
   const params = useParams<{ id: string }>();
@@ -79,18 +92,27 @@ export default function LeadPage() {
       {error ? <ErrorNote message={error} onRetry={() => void load()} /> : null}
       <div className="lead-grid">
       <div className="card" style={{ padding: 22 }}>
+        {events.length === 0 ? <Skeleton rows={4} /> : null}
         <ol className="timeline">
-          {events.map((event) => (
-            <li key={event.id}>
-              <div className="tl-top">
-                <h2 className="tl-title">{eventTitle(event.type)}</h2>
-                <time dateTime={event.createdAt}>{formatWhen(event.createdAt)}</time>
-              </div>
-              <p>{eventNote(event)}</p>
-            </li>
-          ))}
+          {events.map((event, index) => {
+            const previous = events[index - 1];
+            const gap = previous ? new Date(event.createdAt).getTime() - new Date(previous.createdAt).getTime() : 0;
+            return (
+              <li key={event.id} data-step={event.type}>
+                <span className={`step-icon step-${stepTone(event.type)}`} aria-hidden="true" />
+                <div className="tl-top">
+                  <h2 className="tl-title">{eventTitle(event.type)}</h2>
+                  <time dateTime={event.createdAt}>{formatWhen(event.createdAt)}</time>
+                </div>
+                <p>{eventNote(event)}{index > 0 ? ` · ${formatGap(gap)} after the previous step` : ''}</p>
+                <details>
+                  <summary>Request and response</summary>
+                  <JsonBlock value={event.detail} label={`${eventTitle(event.type)} payload`} />
+                </details>
+              </li>
+            );
+          })}
         </ol>
-        {events.length === 0 ? <p className="muted">Waiting for the first step.</p> : null}
         {!booked && (detail?.slots.length ?? 0) > 0 ? (
           <div>
             <h2 style={{ marginTop: 8 }}>Pick a time</h2>

@@ -16,7 +16,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -p packages/domain/tsconfig.json --noEmit && tsc -p packages/db/tsconfig.json --noEmit && tsc -p apps/mock-ghl/tsconfig.json --noEmit && tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/console/tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run --coverage packages/domain apps/api/src",
+    "test:unit": "vitest run --coverage packages/domain apps/api/src apps/console/lib",
     "test:contract": "vitest run apps/mock-ghl/test packages/domain/src/adapters/contract.test.ts",
     "test:integration": "vitest run apps/api/test",
     "test:e2e": "playwright test",

@@ -12,6 +12,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   use: {
     baseURL: 'http://127.0.0.1:3000',
+    video: process.env.RECORD_DEMO ? 'on' : 'off',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -47,6 +48,9 @@ export default defineConfig({
         META_APP_SECRET: 'mock-meta-secret',
         FORM_WEBHOOK_SECRET: 'mock-form-secret',
         QUEUE_POLL_MS: '40',
+        QUEUE_BASE_BACKOFF_MS: '200',
+        QUEUE_JITTER_RATIO: '0',
+        DEMO_STEP_DELAY_MS: '250',
       },
     },
     {

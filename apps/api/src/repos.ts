@@ -269,6 +269,40 @@ export class Repositories implements InstallationStore {
     };
   }
 
+  async openOffers() {
+    const rows = await this.db
+      .select({
+        leadId: offeredSlots.leadId,
+        startTime: offeredSlots.startTime,
+        firstName: leads.firstName,
+        lastName: leads.lastName,
+        status: leads.status,
+      })
+      .from(offeredSlots)
+      .innerJoin(leads, eq(offeredSlots.leadId, leads.id))
+      .where(eq(leads.status, 'offered'));
+    return rows.map((row) => ({
+      leadId: row.leadId,
+      startTime: row.startTime,
+      name: `${row.firstName} ${row.lastName}`.trim(),
+      status: row.status,
+    }));
+  }
+
+  async activityStamps() {
+    const leadRows = await this.db.select({ at: leads.createdAt }).from(leads);
+    const messageRows = await this.db
+      .select({ at: leadEvents.createdAt })
+      .from(leadEvents)
+      .where(inArray(leadEvents.type, ['sms_sent', 'email_sent', 'text_back']));
+    const bookedRows = await this.db.select({ at: leadEvents.createdAt }).from(leadEvents).where(eq(leadEvents.type, 'booked'));
+    return {
+      leads: leadRows.map((row) => row.at),
+      messages: messageRows.map((row) => row.at),
+      booked: bookedRows.map((row) => row.at),
+    };
+  }
+
   async stats() {
     const [leadCount] = await this.db.select({ n: sql<number>`count(*)::int` }).from(leads);
     const [messageCount] = await this.db

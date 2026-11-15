@@ -47,6 +47,7 @@ const envSchema = z.object({
   QUEUE_MAX_BACKOFF_MS: z.coerce.number().int().positive().default(30_000),
   QUEUE_JITTER_RATIO: z.coerce.number().nonnegative().default(0.2),
   QUEUE_POLL_MS: z.coerce.number().int().positive().default(200),
+  DEMO_STEP_DELAY_MS: z.coerce.number().int().nonnegative().default(0),
   FIELD_MAP_PATH: z.string().default('config/field-map.json'),
   CUSTOM_FIELD_IDS_PATH: z.string().default('config/custom-field-ids.json'),
 });
@@ -86,6 +87,7 @@ export interface AppConfig {
   queueMaxMs: number;
   queueJitter: number;
   queuePollMs: number;
+  stepDelayMs: number;
   fieldMap: FieldMap;
   fieldIds: Record<string, string>;
 }
@@ -155,6 +157,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     queueMaxMs: raw.QUEUE_MAX_BACKOFF_MS,
     queueJitter: raw.QUEUE_JITTER_RATIO,
     queuePollMs: raw.QUEUE_POLL_MS,
+    stepDelayMs: raw.DEMO_STEP_DELAY_MS,
     fieldMap,
     fieldIds,
   };

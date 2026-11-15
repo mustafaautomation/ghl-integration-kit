@@ -54,9 +54,22 @@ export interface Stats {
   messages: number;
   booked: number;
   deadLetters: number;
+  series: {
+    leads: number[];
+    messages: number[];
+    booked: number[];
+    deadLetters: number[];
+  };
   mode: string;
   businessName: string;
   locationId: string;
+}
+
+export interface Offer {
+  leadId: string;
+  startTime: string;
+  name: string;
+  status: string;
 }
 
 export interface GhlContact {

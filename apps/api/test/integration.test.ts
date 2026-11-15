@@ -269,6 +269,34 @@ describe('speed-to-lead over HTTP', () => {
     expect(after.refreshes).toBe(before.refreshes + 1);
   });
 
+  it('rejects an invalid Meta verify token', async () => {
+    const res = await fetch(`${base}/webhooks/meta?hub.mode=subscribe&hub.verify_token=wrong-token&hub.challenge=9`);
+    expect(res.status).toBe(403);
+    expect(await res.text()).not.toBe('9');
+  });
+
+  it('honours Retry-After when GHL returns 429, then completes', async () => {
+    const started = Date.now();
+    const res = await fetch(`${base}/demo/fail-outbound`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ failures: 1, retryAfterSeconds: 2, maxAttempts: 3 }),
+    });
+    expect(res.status).toBe(202);
+    const { jobId } = (await res.json()) as { jobId: string };
+    const job = await waitFor(async () => {
+      const body = (await (await fetch(`${base}/queue`)).json()) as {
+        recent: Array<{ id: string; status: string; attempts: number; lastError: string | null; updatedAt: number }>;
+      };
+      const found = body.recent.find((row) => row.id === jobId);
+      return found && (found.status === 'completed' || found.status === 'dead') ? found : null;
+    }, 15_000);
+    expect(job.status).toBe('completed');
+    expect(job.attempts).toBe(2);
+    expect(job.lastError).toMatch(/rate_limited/);
+    expect(job.updatedAt - started).toBeGreaterThanOrEqual(1_500);
+  });
+
   it('marks the location uninstalled', async () => {
     const body = {
       type: 'UNINSTALL',

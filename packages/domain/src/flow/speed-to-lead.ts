@@ -44,11 +44,15 @@ export interface FlowDeps {
   timezone: string;
   now?: () => Date;
   slotWindowDays?: number;
+  stepDelayMs?: number;
 }
 
 async function event(deps: FlowDeps, lead: StoredLead, type: string, status: LeadEventInput['status'], detail?: Record<string, unknown>) {
   deps.log.info({ correlationId: lead.correlationId, leadId: lead.id, step: type, status }, 'lead step');
   await deps.leads.addEvent(lead.id, { type, status, detail });
+  if (deps.stepDelayMs && deps.stepDelayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, deps.stepDelayMs));
+  }
 }
 
 export async function runSpeedToLead(deps: FlowDeps, leadId: string): Promise<StoredLead> {
@@ -68,7 +72,12 @@ export async function runSpeedToLead(deps: FlowDeps, leadId: string): Promise<St
   lead.contactId = contact.id;
   lead.status = 'processing';
   await deps.leads.save(lead);
-  await event(deps, lead, 'upserted', 'ok', { contactId: contact.id, isNew: contact.isNew });
+  await event(deps, lead, 'upserted', 'ok', {
+    contactId: contact.id,
+    isNew: contact.isNew,
+    request: { op: 'POST /contacts/upsert', firstName: lead.firstName, lastName: lead.lastName, email: lead.email, phone: lead.phoneE164, tags: lead.tags, customFields: lead.custom },
+    response: { contactId: contact.id, isNew: contact.isNew },
+  });
 
   if (existing?.openOpportunityId) {
     lead.opportunityId = existing.openOpportunityId;
@@ -92,7 +101,11 @@ export async function runSpeedToLead(deps: FlowDeps, leadId: string): Promise<St
     });
     lead.smsMessageId = sms.id;
     await deps.leads.save(lead);
-    await event(deps, lead, 'sms_sent', 'ok', { messageId: sms.id });
+    await event(deps, lead, 'sms_sent', 'ok', {
+      messageId: sms.id,
+      request: { op: 'POST /conversations/messages', type: 'SMS', contactId: contact.id },
+      response: { messageId: sms.id, conversationId: sms.conversationId },
+    });
   }
 
   if (!lead.emailMessageId && lead.email) {
@@ -106,7 +119,11 @@ export async function runSpeedToLead(deps: FlowDeps, leadId: string): Promise<St
     });
     lead.emailMessageId = sent.id;
     await deps.leads.save(lead);
-    await event(deps, lead, 'email_sent', 'ok', { messageId: sent.id });
+    await event(deps, lead, 'email_sent', 'ok', {
+      messageId: sent.id,
+      request: { op: 'POST /conversations/messages', type: 'Email', contactId: contact.id, subject: email.subject },
+      response: { messageId: sent.id, conversationId: sent.conversationId },
+    });
   }
 
   if (!lead.opportunityId) {
@@ -124,6 +141,8 @@ export async function runSpeedToLead(deps: FlowDeps, leadId: string): Promise<St
     await event(deps, lead, 'opportunity_created', 'ok', {
       opportunityId: opportunity.id,
       stageId: opportunity.stageId,
+      request: { op: 'POST /opportunities/', contactId: contact.id, pipelineId: deps.pipelineId, stageId: deps.stageNew },
+      response: { opportunityId: opportunity.id, stageId: opportunity.stageId, status: opportunity.status },
     });
   }
 
@@ -140,7 +159,11 @@ export async function runSpeedToLead(deps: FlowDeps, leadId: string): Promise<St
   lead.status = 'offered';
   await deps.leads.save(lead);
   await deps.leads.rememberIdentity(lead.email, lead.phoneE164, contact.id, lead.opportunityId);
-  await event(deps, lead, 'slots_offered', 'ok', { slots: times });
+  await event(deps, lead, 'slots_offered', 'ok', {
+    slots: times,
+    request: { op: 'GET /calendars/{id}/free-slots', calendarId: deps.calendarId, timezone: deps.timezone },
+    response: { slots: times },
+  });
   return lead;
 }
 
@@ -158,11 +181,21 @@ export async function bookSlot(deps: FlowDeps, leadId: string, startTime: string
   lead.appointmentId = appointment.id;
   lead.status = 'booked';
   await deps.leads.save(lead);
-  await event(deps, lead, 'booked', 'ok', { appointmentId: appointment.id, startTime: appointment.startTime });
+  await event(deps, lead, 'booked', 'ok', {
+    appointmentId: appointment.id,
+    startTime: appointment.startTime,
+    request: { op: 'POST /calendars/events/appointments', contactId: lead.contactId, calendarId: deps.calendarId, startTime },
+    response: { appointmentId: appointment.id, startTime: appointment.startTime, status: appointment.status },
+  });
 
   if (lead.opportunityId) {
     const moved = await deps.crm.updateOpportunityStage(lead.opportunityId, deps.stageBooked);
-    await event(deps, lead, 'stage_moved', 'ok', { opportunityId: moved.id, stageId: moved.stageId });
+    await event(deps, lead, 'stage_moved', 'ok', {
+      opportunityId: moved.id,
+      stageId: moved.stageId,
+      request: { op: 'PUT /opportunities/{id}', opportunityId: lead.opportunityId, stageId: deps.stageBooked },
+      response: { opportunityId: moved.id, stageId: moved.stageId },
+    });
   }
   return lead;
 }
@@ -180,7 +213,12 @@ export async function runMissedCall(deps: FlowDeps, leadId: string): Promise<Sto
   });
   lead.contactId = contact.id;
   await deps.leads.save(lead);
-  await event(deps, lead, 'upserted', 'ok', { contactId: contact.id, isNew: contact.isNew });
+  await event(deps, lead, 'upserted', 'ok', {
+    contactId: contact.id,
+    isNew: contact.isNew,
+    request: { op: 'POST /contacts/upsert', firstName: lead.firstName, lastName: lead.lastName, email: lead.email, phone: lead.phoneE164, tags: lead.tags, customFields: lead.custom },
+    response: { contactId: contact.id, isNew: contact.isNew },
+  });
   const sms = await deps.crm.sendMessage({
     contactId: contact.id,
     type: 'SMS',

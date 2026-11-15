@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Empty, ErrorNote, Pill } from '../../components/ui';
+import { JsonBlock } from '../../components/Visuals';
+import { Empty, ErrorNote, Pill, Skeleton } from '../../components/ui';
 import { apiGet, type Inspection } from '../../lib/api';
 import { formatWhen } from '../../lib/format';
 
@@ -15,9 +16,9 @@ function signatureHeaders(headers: Record<string, string>): Record<string, strin
   return picked;
 }
 
-function pretty(raw: string): string {
+function parsed(raw: string): unknown {
   try {
-    return JSON.stringify(JSON.parse(raw), null, 2);
+    return JSON.parse(raw) as unknown;
   } catch {
     return raw;
   }
@@ -58,7 +59,9 @@ export default function WebhooksPage() {
       {error ? <ErrorNote message={error} onRetry={() => void load()} /> : null}
       <div className="split">
         <div className="card" style={{ paddingTop: 4 }}>
-          {rows && rows.length === 0 ? (
+          {rows === null ? (
+            <Skeleton />
+          ) : rows.length === 0 ? (
             <Empty title="No deliveries yet" body="Send a test lead, or post a webhook, and the raw payload will show up here." />
           ) : (
             rows?.map((row) => (
@@ -70,6 +73,9 @@ export default function WebhooksPage() {
                 onClick={() => setSelected(String(row.id))}
               >
                 <strong>{row.source}</strong>
+                <Pill tone={!row.signatureValid ? 'bad' : row.idempotentHit ? 'warn' : 'good'}>
+                  {!row.signatureValid ? 'Rejected' : row.idempotentHit ? 'Duplicate' : 'Verified'}
+                </Pill>
                 <span>
                   {row.statusCode} · {row.reason ?? 'accepted'} · {formatWhen(row.createdAt)}
                 </span>
@@ -83,8 +89,8 @@ export default function WebhooksPage() {
           ) : (
             <>
               <div className="row" style={{ marginBottom: 14 }}>
-                <Pill tone={current.signatureValid ? 'good' : 'bad'}>{current.signatureValid ? 'Signature matched' : 'Signature rejected'}</Pill>
-                <Pill tone={current.idempotentHit ? 'warn' : 'neutral'}>{current.idempotentHit ? 'Duplicate event' : 'First delivery'}</Pill>
+                <Pill tone={current.signatureValid ? 'good' : 'bad'}>{current.signatureValid ? 'Verified' : 'Rejected'}</Pill>
+                {current.idempotentHit ? <Pill tone="warn">Duplicate</Pill> : <Pill tone="neutral">First delivery</Pill>}
                 <Pill tone="info">{current.statusCode}</Pill>
               </div>
               <dl className="meta-grid">
@@ -93,7 +99,7 @@ export default function WebhooksPage() {
                 <dt>Reason</dt><dd>{current.reason ?? 'accepted'}</dd>
               </dl>
               <h2>Payload</h2>
-              <pre className="pre" tabIndex={0} aria-label="Webhook payload">{pretty(current.rawBody)}</pre>
+              <JsonBlock value={parsed(current.rawBody)} label="Webhook payload" />
               <h2 style={{ marginTop: 16 }}>Signature headers</h2>
               <pre className="pre" tabIndex={0} aria-label="Signature headers">{JSON.stringify(signatureHeaders(current.headers), null, 2)}</pre>
             </>

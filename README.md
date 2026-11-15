@@ -109,6 +109,7 @@ Every LeadConnector call sends `Authorization: Bearer` and `Version: 2021-07-28`
 | `CONSOLE_ORIGIN` | Allowed browser origin. |
 | `FIELD_MAP_PATH`, `CUSTOM_FIELD_IDS_PATH` | Source field map and GHL custom field ids. |
 | `QUEUE_MAX_ATTEMPTS`, `QUEUE_BASE_BACKOFF_MS`, `QUEUE_MAX_BACKOFF_MS`, `QUEUE_JITTER_RATIO`, `QUEUE_POLL_MS` | Retry policy. |
+| `DEMO_STEP_DELAY_MS` | Pause between speed-to-lead steps so the console can show them. Default 0. |
 | `NEXT_PUBLIC_API_BASE` | Console's API origin. Baked in at `next build`. |
 
 ## Webhooks, replay, and duplicates
@@ -127,7 +128,7 @@ A missed-call shape (`InboundCall` or `CallStatus` with a missed / no-answer / v
 
 Outbound GHL calls run on a SQLite queue (`better-sqlite3`), not BullMQ. The kit does not need a second broker: jobs have to survive a process restart, wait out a `Retry-After`, and land in a dead-letter status the console can query. SQLite does that in one file, tests use a temp file, and Compose stays at Postgres plus the three app processes. A multi-node deploy would swap the queue for BullMQ without renaming the jobs (`speed-to-lead`, `book-appointment`, `missed-call`).
 
-Failed attempts use exponential backoff plus jitter, capped by `QUEUE_MAX_BACKOFF_MS`. A `429` uses `Retry-After` as the floor and still adds jitter, even when that delay is longer than the cap. After `QUEUE_MAX_ATTEMPTS` the row is `dead`. Rows left `active` by a crash go back to `pending` on startup. Logs are pino JSON. Token fields and signature headers are redacted. Each lead's id is the correlation id on the log line and the job.
+Failed attempts use exponential backoff plus jitter, capped by `QUEUE_MAX_BACKOFF_MS`. A `429` uses `Retry-After` as the floor and still adds jitter, even when that delay is longer than the cap. After `QUEUE_MAX_ATTEMPTS` the row is `dead`. `POST /queue/:id/replay` puts a dead job back to `pending` with its attempts cleared. Rows left `active` by a crash go back to `pending` on startup. Logs are pino JSON. Token fields and signature headers are redacted. Each lead's id is the correlation id on the log line and the job.
 
 ## Field map
 
@@ -151,16 +152,22 @@ Counts below are from this workspace on 15 Nov 2026.
 
 | Command | Result |
 | --- | --- |
-| `npm run test:unit` | 68 tests, 14 files. Domain line coverage **98.18%** (1,515 / 1,543 lines). Statements 98.18%, functions 98.38%, branches 80.17%. |
+| `npm run test:unit` | 73 tests, 16 files. Domain line coverage **98.12%** (1,572 / 1,602 lines). Statements 98.12%, functions 98.41%, branches 80.28%. |
 | `npm run test:contract` | 6 tests, 2 files. Three of those rerun the adapter contract from the unit run. The other three hit the mock over HTTP and check the responses against the fixtures in `fixtures/ghl/`. |
-| `npm run test:integration` | 6 tests, 1 file. Boots the mock and the API against Postgres and runs the speed-to-lead path, bad signatures, stale timestamps, duplicates, a form, a missed call, OAuth callback, token refresh, and uninstall. |
-| `npm run test:e2e` | 2 Playwright tests, desktop and mobile. Both include axe checks. |
+| `npm run test:integration` | 8 tests, 1 file. Boots the mock and the API against Postgres. Covers the speed-to-lead path, a bad signature, a stale timestamp, a duplicate event, a form lead, a missed call, an expired token refresh, an invalid Meta verify token, a 429 that waits for `Retry-After`, and uninstall. |
+| `npm run test:e2e` | 19 Playwright tests. Axe on every console page at desktop and mobile widths, navigation and the empty state, a lead watched through to Booked, booking from the calendar, a rejected signature, a duplicate webhook, and a dead-letter job that is replayed. |
 
 Vitest fails the unit run when domain lines drop under 85%, statements under 85%, functions under 80%, or branches under 75%. CI runs lint, typecheck, unit, contract, integration (Postgres service), Playwright (HTML report and traces uploaded), and `docker compose build`. None of those jobs set `continue-on-error`.
 
 ## Console
 
-![Overview on a desktop width](docs/screenshots/overview-filled-desktop.png)
+A test lead moving through the pipeline:
+
+[demo-lead.webm](docs/demo-lead.webm)
+
+![Pipeline mid-run](docs/screenshots/overview-mid-desktop.png)
+
+![Overview after booking](docs/screenshots/overview-filled-desktop.png)
 
 ![Overview on a phone width](docs/screenshots/overview-mobile.png)
 

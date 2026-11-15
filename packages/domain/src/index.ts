@@ -1,5 +1,6 @@
 export * from './ids.js';
 export * from './health.js';
+export * from './stats.js';
 export * from './crypto/aes-gcm.js';
 export * from './oauth/oauth.js';
 export * from './oauth/token-service.js';

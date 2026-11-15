@@ -131,6 +131,8 @@ export function buildMock(opts: MockOptions = {}): FastifyInstance {
   const contacts = new Map<string, Contact>();
   const opportunities = new Map<string, Opportunity>();
   const appointments = new Map<string, Appointment>();
+  let failLeft = 0;
+  let failRetryAfter = '1';
   const counters = {
     exchanges: 0,
     refreshes: 0,
@@ -194,6 +196,11 @@ export function buildMock(opts: MockOptions = {}): FastifyInstance {
     const token = header?.startsWith('Bearer ') ? header.slice(7) : '';
     if (!token || !access.has(token)) {
       return reply.code(401).send({ statusCode: 401, message: 'Invalid token' });
+    }
+    if (failLeft > 0) {
+      failLeft -= 1;
+      counters.rateLimits += 1;
+      return reply.code(429).header('Retry-After', failRetryAfter).send({ statusCode: 429, message: 'Too Many Requests' });
     }
     reply.header('X-RateLimit-Limit-10s', '100');
     reply.header('X-RateLimit-Remaining-10s', '99');
@@ -516,10 +523,23 @@ export function buildMock(opts: MockOptions = {}): FastifyInstance {
 
   app.get('/_debug/counters', async () => counters);
 
+  app.post('/_debug/fail', async (req) => {
+    const body = z
+      .object({
+        count: z.number().int().positive(),
+        retryAfterSeconds: z.number().nonnegative().default(1),
+      })
+      .parse(req.body);
+    failLeft = body.count;
+    failRetryAfter = String(body.retryAfterSeconds);
+    return { ok: true, count: failLeft };
+  });
+
   app.post('/_debug/reset', async () => {
     contacts.clear();
     opportunities.clear();
     appointments.clear();
+    failLeft = 0;
     return { ok: true };
   });
 

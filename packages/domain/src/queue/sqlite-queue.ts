@@ -168,6 +168,16 @@ export class SqliteJobQueue {
     return { status: 'pending', delayMs };
   }
 
+  replay(id: string): Job | null {
+    const current = this.get(id);
+    if (!current || current.status !== 'dead') return null;
+    const now = Date.now();
+    this.db
+      .prepare(`UPDATE jobs SET status = 'pending', attempts = 0, last_error = NULL, run_at = ?, updated_at = ? WHERE id = ?`)
+      .run(now, now, id);
+    return this.get(id);
+  }
+
   get(id: string): Job | null {
     const row = this.db.prepare(`SELECT * FROM jobs WHERE id = ?`).get(id) as JobRow | undefined;
     return row ? toJob(row) : null;

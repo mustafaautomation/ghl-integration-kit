@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Empty, ErrorNote, Pill } from '../../components/ui';
-import { apiGet, type QueueJob } from '../../lib/api';
+import { apiBase, apiGet, type QueueJob } from '../../lib/api';
 import { formatWhen, statusLabel, statusTone } from '../../lib/format';
 
 export default function QueuePage() {
@@ -21,9 +21,19 @@ export default function QueuePage() {
     }
   }
 
+  async function replay(id: string) {
+    setError(null);
+    const res = await fetch(`${apiBase}/queue/${id}/replay`, { method: 'POST' });
+    if (!res.ok) {
+      setError('That job could not be replayed.');
+      return;
+    }
+    await load();
+  }
+
   useEffect(() => {
     void load();
-    const timer = setInterval(() => void load(), 4000);
+    const timer = setInterval(() => void load(), 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -41,9 +51,9 @@ export default function QueuePage() {
         <div className="section-head"><h2>Dead letter</h2></div>
         <div className="card table-wrap" tabIndex={0}>
           {dead.length === 0 ? (
-            <Empty title="Nothing is stuck" body="A job lands here only after its retries are used up." />
+            <Empty title="Nothing is stuck" body="A job lands here only after its retries are used up. Replay sends it back to the queue." />
           ) : (
-            <JobTable jobs={dead} />
+            <JobTable jobs={dead} onReplay={(id) => void replay(id)} />
           )}
         </div>
       </section>
@@ -61,12 +71,12 @@ export default function QueuePage() {
   );
 }
 
-function JobTable({ jobs }: { jobs: QueueJob[] }) {
+function JobTable({ jobs, onReplay }: { jobs: QueueJob[]; onReplay?: (id: string) => void }) {
   return (
     <table className="table">
       <caption className="sr-only">Jobs</caption>
       <thead>
-        <tr><th>Job</th><th>Status</th><th>Attempts</th><th>Lead</th><th>Last error</th><th>Updated</th></tr>
+        <tr><th>Job</th><th>Status</th><th>Attempts</th><th>Lead</th><th>Last error</th><th>Updated</th><th>Replay</th></tr>
       </thead>
       <tbody>
         {jobs.map((job) => (
@@ -77,6 +87,11 @@ function JobTable({ jobs }: { jobs: QueueJob[] }) {
             <td className="mono">{job.correlationId ?? '—'}</td>
             <td>{job.lastError ?? '—'}</td>
             <td>{formatWhen(new Date(job.updatedAt).toISOString())}</td>
+            <td>
+              {job.status === 'dead' && onReplay ? (
+                <button className="btn btn-ghost" type="button" onClick={() => onReplay(job.id)}>Replay</button>
+              ) : '—'}
+            </td>
           </tr>
         ))}
       </tbody>

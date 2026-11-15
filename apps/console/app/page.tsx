@@ -1,17 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { ErrorNote, Pill } from '../components/ui';
-import { apiGet, type LeadSummary, type Stats } from '../lib/api';
+import { Pipeline, Sparkline } from '../components/Visuals';
+import { ErrorNote, Pill, Skeleton } from '../components/ui';
+import { apiBase, apiGet, type LeadEvent, type LeadSummary, type Stats } from '../lib/api';
 import { sourceLabel, statusLabel, statusTone } from '../lib/format';
 
 function Overview() {
-  const router = useRouter();
   const installed = useSearchParams().get('installed') === '1';
   const [stats, setStats] = useState<Stats | null>(null);
   const [leads, setLeads] = useState<LeadSummary[] | null>(null);
+  const [events, setEvents] = useState<LeadEvent[]>([]);
+  const [liveId, setLiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -21,52 +23,82 @@ function Overview() {
       setStats(nextStats);
       setLeads(nextLeads.leads);
       setError(null);
+      return nextLeads.leads;
     } catch {
       setError('The API is not answering on port 4000. Start the stack, then try again.');
+      return [];
     }
   }
 
   useEffect(() => {
-    void load();
+    void (async () => {
+      const rows = await load();
+      const latest = rows[0];
+      if (!latest) return;
+      const detail = await apiGet<{ events: LeadEvent[] }>(`/leads/${latest.id}`);
+      setEvents(detail.events);
+      setLiveId(latest.id);
+    })();
   }, []);
+
+  useEffect(() => {
+    if (!liveId) return;
+    const stream = new EventSource(`${apiBase}/stream?leadId=${liveId}`);
+    const onLead = (message: Event) => {
+      const event = JSON.parse((message as MessageEvent).data) as LeadEvent;
+      setEvents((current) => (current.some((item) => item.id === event.id) ? current : [...current, event]));
+      void load();
+    };
+    stream.addEventListener('lead', onLead);
+    return () => stream.close();
+  }, [liveId]);
 
   async function sendLead() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:4000'}/demo/test-lead`, { method: 'POST' });
+      const res = await fetch(`${apiBase}/demo/test-lead`, { method: 'POST' });
       const body = (await res.json()) as { leadId?: string };
       if (!res.ok || !body.leadId) throw new Error('send failed');
-      router.push(`/leads/${body.leadId}`);
+      const detail = await apiGet<{ events: LeadEvent[] }>(`/leads/${body.leadId}`);
+      setEvents(detail.events);
+      setLiveId(body.leadId);
+      await load();
     } catch {
       setError('The test lead did not go through. Check that the API and the mock are running.');
+    } finally {
       setBusy(false);
     }
   }
 
+  const series = stats?.series;
+
   return (
     <div className="rise">
-      <p className="kicker">Speed to lead</p>
-      <h1>From a new lead to a booked call</h1>
-      <p className="lede">
-        Send a fake Meta lead for Jordan Hale. It takes the same path as a real one: signature check, contact upsert, a first text, an opportunity, and open times on the calendar.
-      </p>
-      <div className="actions row">
-        <button className="btn btn-primary" type="button" onClick={() => void sendLead()} disabled={busy}>
-          {busy ? 'Sending…' : 'Send a test lead'}
-        </button>
-        <Link className="btn btn-ghost" href="/calendar">
-          Open the calendar
-        </Link>
+      <div className="hero">
+        <p className="kicker">Speed to lead</p>
+        <h1>From a new lead to a booked call</h1>
+        <p className="lede">
+          Send a fake Meta lead for Jordan Hale. It takes the same path as a real one: signature check, contact upsert, a first text, an opportunity, and open times on the calendar.
+        </p>
+        <div className="actions row">
+          <button className="btn btn-primary" type="button" onClick={() => void sendLead()} disabled={busy}>
+            {busy ? 'Sending…' : 'Send a test lead'}
+          </button>
+          <Link className="btn btn-ghost" href="/calendar">
+            Open the calendar
+          </Link>
+          {liveId ? <Link href={`/leads/${liveId}`}>Open the timeline</Link> : null}
+        </div>
       </div>
       {installed ? <p className="banner">The location is connected.</p> : null}
       {error ? <ErrorNote message={error} onRetry={() => void load()} /> : null}
 
-      <section className="stats" aria-label="Today">
-        <div className="stat"><span>Leads</span><strong>{stats?.leads ?? '—'}</strong></div>
-        <div className="stat"><span>Messages</span><strong>{stats?.messages ?? '—'}</strong></div>
-        <div className="stat"><span>Booked</span><strong>{stats?.booked ?? '—'}</strong></div>
-        <div className="stat"><span>Dead letters</span><strong>{stats?.deadLetters ?? '—'}</strong></div>
+      <section className="stats" aria-label="Last 8 hours">
+        <Stat label="Leads" value={stats?.leads} series={series?.leads} tone="accent" />
+        <Stat label="Messages" value={stats?.messages} series={series?.messages} tone="warn" />
+        <Stat label="Booked" value={stats?.booked} series={series?.booked} tone="good" />
+        <Stat label="Dead letters" value={stats?.deadLetters} series={series?.deadLetters} tone="bad" />
       </section>
 
       <section className="section">
@@ -74,11 +106,8 @@ function Overview() {
           <h2>How a lead moves</h2>
           <p>{stats ? `${stats.businessName} · ${stats.mode === 'mock' ? 'mock GHL' : 'live GHL'}` : 'Loading'}</p>
         </div>
-        <div className="arch">
-          <article className="card"><p className="step">1</p><h3>Sources</h3><p>Meta Lead Ads, a website form, or a missed-call webhook.</p></article>
-          <article className="card"><p className="step">2</p><h3>This API</h3><p>Check the signature, drop replays, and queue the outbound calls.</p></article>
-          <article className="card"><p className="step">3</p><h3>GHL</h3><p>Save the contact, send the first text, open the opportunity, offer times.</p></article>
-          <article className="card"><p className="step">4</p><h3>This console</h3><p>The timeline updates live as each step finishes.</p></article>
+        <div className="card pipeline-card">
+          <Pipeline events={events} />
         </div>
       </section>
 
@@ -89,11 +118,12 @@ function Overview() {
         </div>
         <div className="card table-wrap" tabIndex={0} aria-label="Recent leads">
           {leads === null ? (
-            <p className="muted" style={{ padding: 18 }}>Loading leads…</p>
+            <Skeleton rows={3} />
           ) : leads.length === 0 ? (
             <div className="empty">
+              <span className="empty-mark" aria-hidden="true" />
               <h2>No leads yet</h2>
-              <p>Send a test lead and it will show up here with a live timeline.</p>
+              <p>Send a test lead and the pipeline above will light up as each step finishes.</p>
             </div>
           ) : (
             <table className="table">
@@ -118,9 +148,21 @@ function Overview() {
   );
 }
 
+function Stat({ label, value, series, tone }: { label: string; value?: number; series?: number[]; tone: 'accent' | 'good' | 'warn' | 'bad' }) {
+  const latest = series?.[series.length - 1] ?? 0;
+  return (
+    <div className={`stat stat-${tone}`}>
+      <span>{label}</span>
+      <strong>{value ?? '—'}</strong>
+      {series ? <Sparkline values={series} tone={tone} /> : <span className="spark-gap" />}
+      <small>{series ? `${latest} in the latest hour` : 'Last 8 hours'}</small>
+    </div>
+  );
+}
+
 export default function Page() {
   return (
-    <Suspense fallback={<p className="muted">Loading the console…</p>}>
+    <Suspense fallback={<Skeleton rows={4} />}>
       <Overview />
     </Suspense>
   );

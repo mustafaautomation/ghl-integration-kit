@@ -53,6 +53,19 @@ describe('sqlite queue', () => {
     q.close();
   });
 
+  it('replays a dead job from the start', () => {
+    const q = queue();
+    const id = q.enqueue('send', { n: 1 }, { maxAttempts: 1 });
+    q.claim(new Date());
+    expect(q.fail(id, new Error('nope'), new Date()).status).toBe('dead');
+    const again = q.replay(id);
+    expect(again?.status).toBe('pending');
+    expect(again?.attempts).toBe(0);
+    expect(q.replay('missing')).toBeNull();
+    expect(q.claim(new Date())?.id).toBe(id);
+    q.close();
+  });
+
   it('runs a handler from the worker', async () => {
     const q = queue();
     const seen: unknown[] = [];
