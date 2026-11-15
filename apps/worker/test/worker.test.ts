@@ -17,6 +17,18 @@ describe('workers runtime', () => {
     const bindings = env as unknown as MigrationBinding;
     await applyD1Migrations(bindings.DB, bindings.TEST_MIGRATIONS);
   });
+  it('sends the mock install through the internal redirect', async () => {
+    const res = await SELF.fetch('https://ghl.test/api/oauth/install', { redirect: 'manual' });
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    const url = new URL(location);
+    expect(url.pathname).toBe('/mock/oauth/chooselocation');
+    expect(url.searchParams.get('client_id')).toBe('mock-client-id');
+    expect(url.searchParams.get('redirect_uri')).toBe('https://mock.internal/api/oauth/callback');
+    expect(url.searchParams.get('scope')).toContain('contacts.write');
+    expect(url.searchParams.get('state')).toBeTruthy();
+  });
+
   it('answers health and readiness', async () => {
     expect((await SELF.fetch('https://ghl.test/api/health')).status).toBe(200);
     const ready = await SELF.fetch('https://ghl.test/api/ready');

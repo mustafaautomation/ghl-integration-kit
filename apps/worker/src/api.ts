@@ -3,7 +3,6 @@ import {
   DEFAULT_SCOPES,
   NotInstalledError,
   OAUTH_AUTHORIZE_URL,
-  OAuthClient,
   bucketHours,
   buildInstallUrl,
   checkOauthState,
@@ -28,7 +27,8 @@ import { Hono } from 'hono';
 import { z, ZodError } from 'zod';
 import type { Env } from './env.js';
 import { runJob } from './jobs.js';
-import { baseUrl, createServices, ensureInstalled, isMock, mockFetch, resetInstallCache, webhookKeys, type Services } from './runtime.js';
+import { locationFromInstall, metaAppSecret } from './live.js';
+import { baseUrl, createServices, ensureInstalled, isMock, resetInstallCache, resolveLocationId, webhookKeys, type Services } from './runtime.js';
 
 const ghlEventSchema = z.object({
   type: z.string().optional(),
@@ -85,8 +85,8 @@ export function createApp() {
     await services.store.insertState(created.state, created.expiresAt);
     const url = buildInstallUrl({
       authorizeUrl: isMock(c.env) ? `${origin}/mock/oauth/chooselocation` : c.env.GHL_OAUTH_AUTHORIZE_URL || OAUTH_AUTHORIZE_URL,
-      clientId: c.env.GHL_CLIENT_ID,
-      redirectUri: `${origin}/api/oauth/callback`,
+      clientId: services.clientId,
+      redirectUri: services.redirectUri,
       scopes: [...DEFAULT_SCOPES],
       state: created.state,
     });
@@ -105,15 +105,8 @@ export function createApp() {
     const verdict = checkOauthState(row, new Date());
     if (verdict !== 'ok') return c.json({ error: `state_${verdict}` }, 400);
     await services.store.markStateUsed(query.data.state, new Date());
-    const exchanged = await new OAuthClient({
-      tokenUrl: isMock(c.env) ? 'https://mock.internal/oauth/token' : `${baseUrl(c.env)}/oauth/token`,
-      clientId: c.env.GHL_CLIENT_ID,
-      clientSecret: c.env.GHL_CLIENT_SECRET,
-      redirectUri: `${origin}/api/oauth/callback`,
-      userType: 'Location',
-      fetchImpl: isMock(c.env) ? mockFetch(c.env) : fetch,
-    }).exchange(query.data.code);
-    await services.tokens.saveFromTokenResponse(exchanged, exchanged.locationId ?? c.env.LOCATION_ID);
+    const exchanged = await services.oauth.exchange(query.data.code);
+    await services.tokens.saveFromTokenResponse(exchanged, locationFromInstall(exchanged.locationId, c.env.LOCATION_ID));
     return c.redirect(`${origin}/?installed=1`, 302);
   });
 
@@ -132,7 +125,7 @@ export function createApp() {
     const raw = JSON.stringify(sample.raw);
     const result = await handleMeta(
       c.env,
-      { raw, headers: { 'content-type': 'application/json', 'x-hub-signature-256': signMetaBody(raw, c.env.META_APP_SECRET) } },
+      { raw, headers: { 'content-type': 'application/json', 'x-hub-signature-256': signMetaBody(raw, metaAppSecret(c.env)) } },
       c.executionCtx,
     );
     const body = (await result.json()) as { leadIds?: string[] };
@@ -191,7 +184,7 @@ export function createApp() {
       },
       mode: isMock(c.env) ? 'mock' : 'live',
       businessName: c.env.BUSINESS_NAME,
-      locationId: c.env.LOCATION_ID,
+      locationId: await resolveLocationId(c.env, services.store),
     });
   });
 
@@ -223,10 +216,10 @@ export function createApp() {
     });
   });
 
-  app.get('/crm/contacts', (c) => proxyCrm(c.env, '/contacts/', { locationId: c.env.LOCATION_ID }, contactsListSchema));
-  app.get('/crm/opportunities', (c) => proxyCrm(c.env, '/opportunities/search', { location_id: c.env.LOCATION_ID }, opportunitiesSearchSchema));
+  app.get('/crm/contacts', (c) => proxyCrm(c.env, '/contacts/', { locationId: '' }, contactsListSchema));
+  app.get('/crm/opportunities', (c) => proxyCrm(c.env, '/opportunities/search', { location_id: '' }, opportunitiesSearchSchema));
   app.get('/crm/appointments', (c) =>
-    proxyCrm(c.env, '/calendars/events', { locationId: c.env.LOCATION_ID, calendarId: c.env.CALENDAR_ID }, eventsListSchema),
+    proxyCrm(c.env, '/calendars/events', { locationId: '', calendarId: c.env.CALENDAR_ID }, eventsListSchema),
   );
   app.get('/offers', async (c) => c.json({ offers: await createServices(c.env).store.openOffers() }));
   app.get('/queue', async (c) => {
@@ -343,7 +336,7 @@ async function handleGhl(env: Env, input: { raw: string; headers: Record<string,
     return Response.json({ success: true, duplicate: true });
   }
   if (isUninstallEvent(parsed.data.type)) {
-    await services.tokens.markUninstalled(parsed.data.locationId ?? env.LOCATION_ID);
+    await services.tokens.markUninstalled(parsed.data.locationId ?? (await resolveLocationId(env, services.store)));
     resetInstallCache();
     await services.store.inspect({ source: 'ghl', eventId: parsed.data.webhookId, signatureValid: true, idempotentHit: false, statusCode: 200, reason: 'uninstalled', rawBody: input.raw, headers: input.headers });
     return Response.json({ success: true, uninstalled: true });
@@ -479,8 +472,12 @@ async function handleForm(
 async function proxyCrm(env: Env, pathName: string, query: Record<string, string>, schema: z.ZodType<unknown>): Promise<Response> {
   const services = createServices(env);
   try {
-    const token = await services.tokens.getValidAccessToken(env.LOCATION_ID);
-    const json = await ghlFetch(baseUrl(env), { method: 'GET', path: pathName, token, query }, { fetchImpl: services.fetchImpl });
+    const locationId = await resolveLocationId(env, services.store);
+    const nextQuery = { ...query };
+    if ('locationId' in nextQuery) nextQuery.locationId = locationId;
+    if ('location_id' in nextQuery) nextQuery.location_id = locationId;
+    const token = await services.tokens.getValidAccessToken(locationId);
+    const json = await ghlFetch(baseUrl(env), { method: 'GET', path: pathName, token, query: nextQuery }, { fetchImpl: services.fetchImpl });
     return Response.json(schema.parse(json));
   } catch (error) {
     if (error instanceof NotInstalledError) return Response.json({ error: 'not_installed' }, { status: 409 });

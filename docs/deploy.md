@@ -2,7 +2,7 @@
 
 Local use stays `docker compose up --build`. The public host is one Cloudflare Worker on the free plan. It serves the operator console, the API, and the mock LeadConnector on one origin. Do not put secrets in this file or in git. `wrangler secret put` stores them on your account.
 
-The first deploy uses `*.workers.dev`. Attach `ghl.quvantic.com` after that.
+The Worker script is `leadrouter`. The first deploy is `https://leadrouter.squishwala.workers.dev`. HighLevel rejects a redirect URL that contains `ghl`, so the script is not named `ghl`. Attach `leads.quvantic.com` after the workers.dev host works.
 
 ## What runs
 
@@ -59,7 +59,7 @@ npx wrangler deploy
 
 `npm run build:workers` builds the console and runs `wrangler deploy --dry-run`. It does not publish.
 
-The deploy prints a `*.workers.dev` URL. Open that, then send a test lead from the console. The API is `/api` on the same host. The mock consent screen, if you use Install, is `/mock/oauth/chooselocation`.
+The deploy prints `https://leadrouter.<account>.workers.dev`. Open that, then send a test lead from the console. The API is `/api` on the same host. Install is `GET /api/oauth/install`. The callback is `GET /api/oauth/callback`. The mock consent screen, if you use Install in mock mode, is `/mock/oauth/chooselocation`.
 
 ### Custom domain
 
@@ -67,7 +67,7 @@ After the workers.dev deploy works, uncomment the route block in `wrangler.toml`
 
 ```toml
 [[routes]]
-pattern = "ghl.quvantic.com"
+pattern = "leads.quvantic.com"
 custom_domain = true
 ```
 
@@ -81,25 +81,30 @@ Cloudflare creates the DNS record. The console and the API stay on that one orig
 
 ### Secrets
 
-Mock mode deploys with the vars already in `wrangler.toml`. You do not need a secret for that.
+Mock mode deploys with the non-secret `[vars]` in `wrangler.toml`. Client id, client secret, webhook secrets, and the demo encryption key are filled in code when they are absent. You do not need a secret for that.
 
-For `GHL_MODE=live`, set real values. A secret replaces the var of the same name:
+A secret does not override a `[vars]` entry of the same name. Secret names must not appear under `[vars]`. The names below are absent from `[vars]` so `wrangler secret put` can set them.
+
+Live mode (`GHL_MODE=live`) needs these secrets:
 
 ```bash
 npx wrangler secret put TOKEN_ENCRYPTION_KEY
 npx wrangler secret put GHL_CLIENT_ID
 npx wrangler secret put GHL_CLIENT_SECRET
+npx wrangler secret put GHL_REDIRECT_URI
 npx wrangler secret put META_APP_SECRET
 npx wrangler secret put META_VERIFY_TOKEN
 npx wrangler secret put FORM_WEBHOOK_SECRET
 ```
 
-`TOKEN_ENCRYPTION_KEY` must be 32 bytes of base64 (`openssl rand -base64 32`). Live mode refuses the demo key. Also set `GHL_MODE=live` and, if you want a non-default consent screen, `GHL_OAUTH_AUTHORIZE_URL`. The redirect URI you register at HighLevel is `https://ghl.quvantic.com/api/oauth/callback`.
+`TOKEN_ENCRYPTION_KEY` must be 32 bytes of base64 (`openssl rand -base64 32`). Live mode refuses the demo key. `GHL_REDIRECT_URI` must be the callback registered on the HighLevel app: `https://leadrouter.squishwala.workers.dev/api/oauth/callback`, or later `https://leads.quvantic.com/api/oauth/callback`. `GET /api/oauth/install` sends that same URI, the client id, and the default scopes. The callback stores tokens for the `locationId` on the token response. `LOCATION_ID` is optional in live mode; when it is unset, later calls use that installed location.
+
+Also set `GHL_MODE=live`. `GHL_BASE_URL` stays `https://services.leadconnectorhq.com`. `GHL_USER_TYPE` is `Location` or `Company`. `GHL_OAUTH_AUTHORIZE_URL` can stay the marketplace consent URL.
 
 Changing a secret does not require a rebuild of the console. Changing `NEXT_PUBLIC_API_BASE` does, because Next bakes it into the static assets. The Workers build sets it to `/api`.
 
 ## Abuse and the wipe
 
-`RATE_LIMIT_MAX` is 120 requests per minute per IP on `/api` and `/mock`. `/api/health` and `/api/ready` are not counted. Bodies over `BODY_LIMIT_BYTES` (256 KB) return 413.
+`RATE_LIMIT_MAX` is 120 requests per minute per IP on `/api` and `/mock`. IPv6 addresses share a bucket for each /64. IPv4 addresses are counted as written. `/api/health` and `/api/ready` are not counted. Bodies over `BODY_LIMIT_BYTES` (256 KB) return 413. `/leads/<id>/index.txt` is served from the same static shell as `/leads/<id>`.
 
 The cron deletes lead, inspection, identity, slot, and job rows, and POSTs the mock's reset. It does not delete `installations`, so the mock location stays connected. A manual wipe is `POST /api/demo/reset` and only exists in mock mode.

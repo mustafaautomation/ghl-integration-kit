@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['packages/**/*.test.ts', 'apps/**/*.test.ts'],
-    exclude: ['apps/worker/**', '**/node_modules/**'],
+    exclude: ['apps/worker/test/**', '**/node_modules/**'],
     testTimeout: 20_000,
     hookTimeout: 30_000,
     coverage: {

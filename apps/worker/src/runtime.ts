@@ -1,6 +1,5 @@
 import { D1Queue, D1Store } from '@ghl/db/d1';
 import {
-  DEMO_ENCRYPTION_KEY_B64,
   DEFAULT_SCOPES,
   GhlAdapter,
   LEADCONNECTOR_VERSION,
@@ -21,17 +20,38 @@ import fieldIdsJson from '../../../config/custom-field-ids.json';
 import fieldMapJson from '../../../config/field-map.json';
 import type { Env } from './env.js';
 import { TEST_ED25519_PUBLIC_KEY, TEST_RSA_PUBLIC_KEY } from './keys.js';
+import {
+  encryptionKey,
+  formWebhookSecret,
+  isLive,
+  leadConnectorBaseUrl,
+  locationFromInstall,
+  metaAppSecret,
+  metaVerifyToken,
+  oauthClientId,
+  oauthClientSecret,
+  oauthRedirectUri,
+  oauthUserType,
+} from './live.js';
 
 const fieldMap = fieldMapSchema.parse(fieldMapJson);
 const fieldIds = fieldIdsJson;
 
 export function isMock(env: Env): boolean {
-  return env.GHL_MODE !== 'live';
+  return !isLive(env);
 }
 
 export function baseUrl(env: Env): string {
-  if (isMock(env)) return 'https://mock.internal';
-  return env.GHL_BASE_URL.replace(/\/$/, '');
+  return leadConnectorBaseUrl(env);
+}
+
+export async function resolveLocationId(env: Env, store: D1Store): Promise<string> {
+  const configured = env.LOCATION_ID?.trim();
+  if (configured) return configured;
+  const installed = await store.latestActive();
+  if (installed) return installed.locationId;
+  if (!isLive(env)) return 'loc_northwind_555';
+  throw new Error('No installed location. Open /api/oauth/install or set LOCATION_ID.');
 }
 
 export function webhookKeys(env: Env): WebhookKeys {
@@ -67,9 +87,6 @@ function silentLog(): AppLogger {
 }
 
 export function createServices(env: Env) {
-  if (!isMock(env) && env.TOKEN_ENCRYPTION_KEY === DEMO_ENCRYPTION_KEY_B64) {
-    throw new Error('Refusing to start live mode with the demo encryption key.');
-  }
   const fetchImpl = isMock(env) ? mockFetch(env) : fetch;
   const store = new D1Store(env.DB);
   const queue = new D1Queue(env.DB, env.JOBS, {
@@ -78,26 +95,34 @@ export function createServices(env: Env) {
     maxMs: 30_000,
     jitterRatio: 0,
   });
-  const redirectUri = 'https://mock.internal/api/oauth/callback';
+  const redirectUri = oauthRedirectUri(env);
+  const userType = oauthUserType(env);
+  const clientId = oauthClientId(env);
+  const clientSecret = oauthClientSecret(env);
   const oauth = new OAuthClient({
     tokenUrl: `${baseUrl(env)}/oauth/token`,
-    clientId: env.GHL_CLIENT_ID,
-    clientSecret: env.GHL_CLIENT_SECRET,
+    clientId,
+    clientSecret,
     redirectUri,
-    userType: 'Location',
+    userType,
     fetchImpl,
   });
-  const tokens = new TokenService(store, oauth, parseEncryptionKey(env.TOKEN_ENCRYPTION_KEY), 300_000);
+  const tokens = new TokenService(store, oauth, parseEncryptionKey(encryptionKey(env)), 300_000);
+  const locationId = async () => {
+    const id = await resolveLocationId(env, store);
+    return id;
+  };
   const crm = new GhlAdapter({
     baseUrl: baseUrl(env),
-    locationId: env.LOCATION_ID,
+    locationId: env.LOCATION_ID?.trim() || 'loc_northwind_555',
+    getLocationId: locationId,
+    getToken: async () => tokens.getValidAccessToken(await locationId()),
     fieldIds,
-    getToken: () => tokens.getValidAccessToken(env.LOCATION_ID),
     fetchImpl,
   });
-  const meta = new MetaLeadSource({ appSecret: env.META_APP_SECRET, verifyToken: env.META_VERIFY_TOKEN, fieldMap });
-  const forms = new WebsiteFormSource({ secret: env.FORM_WEBHOOK_SECRET, fieldMap });
-  return { store, queue, oauth, tokens, crm, meta, forms, fetchImpl, redirectUri, fieldMap };
+  const meta = new MetaLeadSource({ appSecret: metaAppSecret(env), verifyToken: metaVerifyToken(env), fieldMap });
+  const forms = new WebsiteFormSource({ secret: formWebhookSecret(env), fieldMap });
+  return { store, queue, oauth, tokens, crm, meta, forms, fetchImpl, redirectUri, userType, clientId, fieldMap };
 }
 
 export type Services = ReturnType<typeof createServices>;
@@ -138,22 +163,23 @@ export function ensureInstalled(env: Env): Promise<void> {
 
 async function installMock(env: Env): Promise<void> {
   const services = createServices(env);
-  const existing = await services.store.get(env.LOCATION_ID);
+  const locationId = await resolveLocationId(env, services.store);
+  const existing = await services.store.get(locationId);
   if (existing && !existing.uninstalledAt) {
-    const token = await services.tokens.getValidAccessToken(env.LOCATION_ID).catch(() => '');
+    const token = await services.tokens.getValidAccessToken(locationId).catch(() => '');
     const res = token
-      ? await services.fetchImpl(new URL(`/locations/${env.LOCATION_ID}`, `${baseUrl(env)}/`), {
+      ? await services.fetchImpl(new URL(`/locations/${locationId}`, `${baseUrl(env)}/`), {
           headers: { Authorization: `Bearer ${token}`, Version: LEADCONNECTOR_VERSION, Accept: 'application/json' },
         })
       : null;
     if (res?.ok) return;
-    await services.tokens.markUninstalled(env.LOCATION_ID);
+    await services.tokens.markUninstalled(locationId);
   }
   const created = createOauthState(new Date(), 600_000);
   await services.store.insertState(created.state, created.expiresAt);
   const authorize = new URL('/oauth/chooselocation', `${baseUrl(env)}/`);
   authorize.searchParams.set('response_type', 'code');
-  authorize.searchParams.set('client_id', env.GHL_CLIENT_ID);
+  authorize.searchParams.set('client_id', services.clientId);
   authorize.searchParams.set('redirect_uri', services.redirectUri);
   authorize.searchParams.set('scope', DEFAULT_SCOPES.join(' '));
   authorize.searchParams.set('state', created.state);
@@ -166,7 +192,7 @@ async function installMock(env: Env): Promise<void> {
   if (verdict !== 'ok') throw new Error(`state_${verdict}`);
   await services.store.markStateUsed(created.state, new Date());
   const exchanged = await services.oauth.exchange(body.code);
-  await services.tokens.saveFromTokenResponse(exchanged, env.LOCATION_ID);
+  await services.tokens.saveFromTokenResponse(exchanged, locationFromInstall(exchanged.locationId, env.LOCATION_ID));
 }
 
 export function resetInstallCache(): void {
