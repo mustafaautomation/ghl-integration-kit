@@ -1,0 +1,9 @@
+{
+  "location": {
+    "id": "loc_northwind_555",
+    "name": "Northwind Studio",
+    "companyId": "co_northwind_555",
+    "timezone": "America/New_York"
+  },
+  "traceId": "trace_mock_555"
+}

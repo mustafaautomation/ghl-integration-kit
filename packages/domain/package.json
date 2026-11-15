@@ -1,0 +1,16 @@
+{
+  "name": "@ghl/domain",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./edge": "./src/edge.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "libphonenumber-js": "^1.11.18",
+    "pino": "^9.6.0",
+    "zod": "^3.24.1"
+  }
+}

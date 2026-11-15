@@ -1,0 +1,75 @@
+name = "ghl"
+main = "apps/worker/src/index.ts"
+compatibility_date = "2026-03-10"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Custom domain is attached after the first workers.dev deploy. See docs/deploy.md.
+# [[routes]]
+# pattern = "ghl.quvantic.com"
+# custom_domain = true
+
+[assets]
+directory = "apps/console/out"
+binding = "ASSETS"
+run_worker_first = true
+html_handling = "auto-trailing-slash"
+not_found_handling = "none"
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ghl"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "packages/db/src/d1"
+
+[[durable_objects.bindings]]
+name = "MOCK"
+class_name = "MockGhl"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MockGhl"]
+
+[[queues.producers]]
+queue = "ghl-jobs"
+binding = "JOBS"
+
+[[queues.consumers]]
+queue = "ghl-jobs"
+max_batch_size = 5
+max_batch_timeout = 1
+max_retries = 5
+dead_letter_queue = "ghl-jobs-dlq"
+
+[[queues.consumers]]
+queue = "ghl-jobs-dlq"
+max_batch_size = 5
+max_retries = 1
+
+# Mock credentials. They match the bundled mock and .env.example.
+# Live mode replaces them with `wrangler secret put`. Secrets override these vars.
+[vars]
+GHL_MODE = "mock"
+GHL_CLIENT_ID = "mock-client-id"
+GHL_CLIENT_SECRET = "mock-client-secret"
+GHL_BASE_URL = "https://services.leadconnectorhq.com"
+META_VERIFY_TOKEN = "mock-meta-verify"
+META_APP_SECRET = "mock-meta-secret"
+FORM_WEBHOOK_SECRET = "mock-form-secret"
+TOKEN_ENCRYPTION_KEY = "ZGVtby1vbmx5LWtleS1ub3QtZm9yLWxpdmUtdXNlISE="
+BUSINESS_NAME = "Northwind Studio"
+LOCATION_ID = "loc_northwind_555"
+COMPANY_ID = "co_northwind_555"
+USER_ID = "user_555"
+PIPELINE_ID = "pipe_new_leads"
+PIPELINE_STAGE_NEW = "stage_new"
+PIPELINE_STAGE_BOOKED = "stage_booked"
+CALENDAR_ID = "cal_intro"
+TIMEZONE = "America/New_York"
+RATE_LIMIT_MAX = "120"
+RATE_LIMIT_WINDOW_MS = "60000"
+QUEUE_MAX_ATTEMPTS = "5"
+BODY_LIMIT_BYTES = "262144"

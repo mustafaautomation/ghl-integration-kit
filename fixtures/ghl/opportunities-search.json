@@ -1,0 +1,25 @@
+{
+  "opportunities": [
+    {
+      "id": "opp_555",
+      "name": "Jordan Hale — A first consult",
+      "monetaryValue": 0,
+      "pipelineId": "pipe_new_leads",
+      "pipelineStageId": "stage_new",
+      "status": "open",
+      "contactId": "contact_555",
+      "locationId": "loc_northwind_555",
+      "source": "Meta Lead Ads"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "nextPageUrl": null,
+    "startAfterId": null,
+    "startAfter": null,
+    "currentPage": 1,
+    "nextPage": null,
+    "prevPage": null
+  },
+  "traceId": "trace_mock_555"
+}

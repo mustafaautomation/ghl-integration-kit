@@ -1,0 +1,16 @@
+{
+  "events": [
+    {
+      "id": "appt_555",
+      "calendarId": "cal_intro",
+      "locationId": "loc_northwind_555",
+      "contactId": "contact_555",
+      "title": "Intro with Jordan Hale",
+      "startTime": "2026-11-17T15:00:00-05:00",
+      "endTime": "2026-11-17T15:30:00-05:00",
+      "appointmentStatus": "confirmed",
+      "status": "booked"
+    }
+  ],
+  "traceId": "trace_mock_555"
+}

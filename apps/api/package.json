@@ -1,0 +1,13 @@
+{
+  "name": "@ghl/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@ghl/db": "*",
+    "@ghl/domain": "*",
+    "fastify": "^5.2.0",
+    "zod": "^3.24.1"
+  }
+}

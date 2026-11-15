@@ -1,0 +1,25 @@
+{
+  "contacts": [
+    {
+      "id": "contact_555",
+      "locationId": "loc_northwind_555",
+      "firstName": "Jordan",
+      "lastName": "Hale",
+      "email": "jordan.hale@example.com",
+      "phone": "+12025550148",
+      "tags": ["meta-lead", "speed-to-lead"],
+      "source": "Meta Lead Ads",
+      "dateAdded": "2026-11-15T12:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "nextPageUrl": null,
+    "startAfterId": null,
+    "startAfter": null,
+    "currentPage": 1,
+    "nextPage": null,
+    "prevPage": null
+  },
+  "traceId": "trace_mock_555"
+}

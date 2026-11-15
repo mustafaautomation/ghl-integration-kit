@@ -1,0 +1,17 @@
+{
+  "new": true,
+  "contact": {
+    "id": "contact_555",
+    "locationId": "loc_northwind_555",
+    "firstName": "Jordan",
+    "lastName": "Hale",
+    "email": "jordan.hale@example.com",
+    "phone": "+12025550148",
+    "tags": ["meta-lead", "speed-to-lead"],
+    "source": "Meta Lead Ads",
+    "customFields": [{ "id": "cf_interest", "field_value": "A first consult" }],
+    "dateAdded": "2026-11-15T12:00:00.000Z",
+    "dateUpdated": "2026-11-15T12:00:00.000Z"
+  },
+  "traceId": "trace_mock_555"
+}
