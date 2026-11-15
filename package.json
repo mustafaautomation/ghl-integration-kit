@@ -1,0 +1,46 @@
+{
+  "name": "ghl-integration-kit",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "GoHighLevel marketplace install, signed webhooks, and a speed-to-lead flow, with a mock so it runs without a GHL account.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -p packages/domain/tsconfig.json --noEmit && tsc -p packages/db/tsconfig.json --noEmit && tsc -p apps/mock-ghl/tsconfig.json --noEmit && tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/console/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run --coverage packages/domain apps/api/src",
+    "test:contract": "vitest run apps/mock-ghl/test packages/domain/src/adapters/contract.test.ts",
+    "test:integration": "vitest run apps/api/test",
+    "test:e2e": "playwright test",
+    "dev:mock": "tsx apps/mock-ghl/src/main.ts",
+    "dev:api": "tsx apps/api/src/main.ts",
+    "dev:console": "npm run dev -w @ghl/console",
+    "start:mock": "tsx apps/mock-ghl/src/main.ts",
+    "start:api": "tsx apps/api/src/main.ts",
+    "start:console": "npm run start -w @ghl/console",
+    "db:migrate": "tsx packages/db/src/migrate-cli.ts"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@eslint/js": "^9.16.0",
+    "@playwright/test": "^1.49.1",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^9.16.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^2.1.8"
+  }
+}

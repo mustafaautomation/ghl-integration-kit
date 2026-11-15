@@ -1,0 +1,17 @@
+node_modules
+dist
+.next
+coverage
+playwright-report
+test-results
+blob-report
+data
+.env
+.env.local
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+npm-debug.log*
+tsconfig.tsbuildinfo
+.DS_Store

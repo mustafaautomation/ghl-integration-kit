@@ -1,0 +1,8 @@
+{
+  "conversationId": "conv_555",
+  "messageId": "msg_555",
+  "emailMessageId": null,
+  "messageIds": ["msg_555"],
+  "msg": "queued",
+  "traceId": "trace_mock_555"
+}

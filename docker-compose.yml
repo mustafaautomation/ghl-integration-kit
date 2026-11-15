@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ghl
+      POSTGRES_PASSWORD: ghl
+      POSTGRES_DB: ghl
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghl -d ghl"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mock-ghl:
+    build:
+      context: .
+      target: mock
+    environment:
+      PORT: "4100"
+      HOST: 0.0.0.0
+      GHL_CLIENT_ID: mock-client-id
+      GHL_CLIENT_SECRET: mock-client-secret
+      LOCATION_ID: loc_northwind_555
+      COMPANY_ID: co_northwind_555
+      BUSINESS_NAME: Northwind Studio
+    ports:
+      - "4100:4100"
+
+  api:
+    build:
+      context: .
+      target: api
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "4000"
+      DATABASE_URL: postgres://ghl:ghl@postgres:5432/ghl
+      GHL_BASE_URL: http://mock-ghl:4100
+      GHL_OAUTH_AUTHORIZE_URL: http://localhost:4100/oauth/chooselocation
+      QUEUE_DB_PATH: /data/queue.sqlite
+      CONSOLE_ORIGIN: http://localhost:3000
+    ports:
+      - "4000:4000"
+    volumes:
+      - queuedata:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mock-ghl:
+        condition: service_started
+
+  console:
+    build:
+      context: .
+      target: console
+      args:
+        NEXT_PUBLIC_API_BASE: http://localhost:4000
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  queuedata:

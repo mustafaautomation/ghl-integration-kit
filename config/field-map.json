@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "full_name": { "to": "name" },
+    "first_name": { "to": "firstName" },
+    "last_name": { "to": "lastName" },
+    "email": { "to": "email" },
+    "phone_number": { "to": "phone" },
+    "interested_in": { "to": "custom", "key": "interest" }
+  },
+  "website_form": {
+    "first_name": { "to": "firstName" },
+    "last_name": { "to": "lastName" },
+    "email": { "to": "email" },
+    "phone": { "to": "phone" },
+    "service": { "to": "custom", "key": "interest" },
+    "page": { "to": "custom", "key": "landing_page" }
+  },
+  "missed_call": {
+    "name": { "to": "name" },
+    "email": { "to": "email" },
+    "phone": { "to": "phone" }
+  }
+}
