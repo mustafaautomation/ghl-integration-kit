@@ -1,4 +1,4 @@
-FROM node:20-bookworm AS build
+FROM node:26-bookworm AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
@@ -11,7 +11,7 @@ ARG NEXT_PUBLIC_API_BASE=http://localhost:4000
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 RUN npm run build -w @ghl/console
 
-FROM node:20-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 WORKDIR /app
 COPY --from=build /app /app
 ENV NODE_ENV=production
