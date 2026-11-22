@@ -6,7 +6,7 @@
   "dependencies": {
     "@ghl/db": "*",
     "@ghl/domain": "*",
-    "hono": "^4.13.18",
+    "hono": "^4.13.19",
     "zod": "^3.24.1"
   }
 }
