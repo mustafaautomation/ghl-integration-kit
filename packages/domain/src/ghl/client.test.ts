@@ -110,4 +110,22 @@ describe('ghlFetch', () => {
       expect((error as Error).message).not.toContain('leaked');
     }
   });
+
+  it('throws GhlApiError with the status when an error body is not JSON', async () => {
+    server = createServer((_req, res) => {
+      res.writeHead(502, { 'Content-Type': 'text/html' });
+      res.end('<html><body>Bad gateway leaked-upstream-detail</body></html>');
+    });
+    await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('no port');
+    try {
+      await ghlFetch(`http://127.0.0.1:${address.port}`, { method: 'GET', path: '/contacts/', token: 't' });
+      throw new Error('should have failed');
+    } catch (error) {
+      expect(error).toBeInstanceOf(GhlApiError);
+      expect((error as GhlApiError).status).toBe(502);
+      expect((error as Error).message).not.toContain('leaked');
+    }
+  });
 });

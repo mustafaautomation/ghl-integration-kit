@@ -33,10 +33,16 @@ export async function ghlFetch(
   if (res.status === 429) {
     throw new RateLimitError(parseRetryAfter(res.headers.get('retry-after'), opts?.now?.() ?? new Date()));
   }
-  const text = await res.text();
-  const json: unknown = text ? JSON.parse(text) : null;
   if (!res.ok) {
+    // Check the status before parsing: gateways answer 5xx with HTML, and a
+    // JSON SyntaxError would hide the status and quote the body in its message.
     throw new GhlApiError(res.status, `ghl_request_failed_${res.status}`);
   }
-  return json;
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new GhlApiError(res.status, 'ghl_invalid_json');
+  }
 }

@@ -152,11 +152,15 @@ The same email or phone does not get a second first text while an opportunity is
 
 ## Tests
 
-Counts below are from this workspace on 15 Nov 2026.
+Run `npm ci` first. `lint`, `typecheck`, `test:unit`, `test:contract`, and `test:workers` need nothing else. `test:integration` and `test:e2e` need a Postgres: start one with `docker compose up -d postgres` and set `DATABASE_URL=postgres://ghl:ghl@localhost:5432/ghl`. `test:integration` stops with `DATABASE_URL is required` when it is unset. `test:e2e` also needs `npx playwright install chromium` and `npm run build -w @ghl/console` first. Plain `npm test` runs every Vitest file, so it includes the integration file and needs `DATABASE_URL` too.
+
+Counts below are from this workspace on 26 Nov 2026, except the integration and e2e rows, which are from 15 Nov 2026.
 
 | Command | Result |
 | --- | --- |
-| `npm run test:unit` | 73 tests, 16 files. Domain line coverage **98.12%** (1,572 / 1,602 lines). Statements 98.12%, functions 98.41%, branches 80.28%. |
+| `npm run lint`, `npm run typecheck` | ESLint and `tsc --noEmit` for every package. |
+| `npm run test:unit` | 81 tests, 17 files. Domain line coverage **98.01%** (1,578 / 1,610 lines). Statements 98.01%, functions 98.38%, branches 79.77%. |
+| `npm run test:workers` | 7 tests, 1 file. Runs the Cloudflare Worker in workerd through `@cloudflare/vitest-pool-workers`. Writes a placeholder `apps/console/out/index.html` when the console export is missing. |
 | `npm run test:contract` | 6 tests, 2 files. Three of those rerun the adapter contract from the unit run. The other three hit the mock over HTTP and check the responses against the fixtures in `fixtures/ghl/`. |
 | `npm run test:integration` | 8 tests, 1 file. Boots the mock and the API against Postgres. Covers the speed-to-lead path, a bad signature, a stale timestamp, a duplicate event, a form lead, a missed call, an expired token refresh, an invalid Meta verify token, a 429 that waits for `Retry-After`, and uninstall. |
 | `npm run test:e2e` | 19 Playwright tests. Axe on every console page at desktop and mobile widths, navigation and the empty state, a lead watched through to Booked, booking from the calendar, a rejected signature, a duplicate webhook, and a dead-letter job that is replayed. |
